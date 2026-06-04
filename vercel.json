@@ -1,170 +1,196 @@
-export const config = { api: { bodyParser: false } };
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>视频拆解工具</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1a1a1a; min-height: 100vh; padding: 2rem 1rem; }
+  .wrap { max-width: 680px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+  .sub { font-size: 14px; color: #666; margin-bottom: 1.5rem; }
+  .card { background: #fff; border: 1px solid #e5e5e5; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+  .label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .api-row { display: flex; gap: 8px; }
+  input[type=text], input[type=password], textarea { width: 100%; padding: 9px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; background: #fafafa; color: #1a1a1a; outline: none; transition: border-color 0.15s; }
+  input[type=text]:focus, input[type=password]:focus, textarea:focus { border-color: #999; background: #fff; }
+  textarea { min-height: 90px; resize: vertical; font-family: inherit; line-height: 1.6; }
+  .toggle { padding: 9px 14px; font-size: 13px; background: #f0f0f0; border: 1px solid #ddd; border-radius: 8px; cursor: pointer; color: #555; white-space: nowrap; }
+  .toggle:hover { background: #e8e8e8; }
+  .drop { border: 2px dashed #ddd; border-radius: 10px; padding: 2rem; text-align: center; cursor: pointer; transition: all 0.15s; }
+  .drop:hover, .drop.over { background: #f0f7ff; border-color: #93c5fd; }
+  .drop-icon { font-size: 2rem; margin-bottom: 8px; }
+  .drop p { font-size: 14px; color: #555; }
+  .drop .hint { font-size: 12px; color: #aaa; margin-top: 4px; }
+  .preview { display: none; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 12px; background: #f5f5f5; border-radius: 8px; }
+  .preview span { font-size: 13px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .preview .sz { font-size: 12px; color: #999; }
+  .preview .rm { background: none; border: none; cursor: pointer; font-size: 18px; color: #aaa; line-height: 1; padding: 0 4px; }
+  .preview .rm:hover { color: #555; }
+  .dims { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+  .dim { display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: #fafafa; border: 1px solid #e5e5e5; border-radius: 8px; cursor: pointer; transition: background 0.1s; }
+  .dim:hover { background: #f0f0f0; }
+  .dim input { accent-color: #1a1a1a; cursor: pointer; }
+  .dim label { font-size: 13px; cursor: pointer; }
+  .btn { width: 100%; padding: 12px; font-size: 15px; font-weight: 600; background: #1a1a1a; color: #fff; border: none; border-radius: 8px; cursor: pointer; transition: opacity 0.15s; margin-top: 4px; }
+  .btn:hover { opacity: 0.85; }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .status { text-align: center; font-size: 13px; color: #888; min-height: 22px; margin-top: 10px; }
+  .err { background: #fff0f0; color: #c0392b; border: 1px solid #f5c6c6; border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-top: 10px; display: none; }
+  .results { margin-top: 1.5rem; display: none; }
+  .results h2 { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+  .rcard { background: #fff; border: 1px solid #e5e5e5; border-radius: 10px; padding: 1.1rem 1.25rem; margin-bottom: 10px; }
+  .rcard h3 { font-size: 14px; font-weight: 600; color: #444; margin-bottom: 8px; }
+  .rcard .content { font-size: 14px; line-height: 1.8; color: #222; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎬 视频拆解工具</h1>
+  <p class="sub">上传视频 + 粘贴字幕，AI 帮你拆解爆款逻辑</p>
 
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key');
+  <div class="card">
+    <div class="label">Gemini API Key</div>
+    <div class="api-row">
+      <input type="password" id="apiKey" placeholder="AIza..." />
+      <button class="toggle" onclick="toggleKey()">显示</button>
+    </div>
+  </div>
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  <div class="card">
+    <div class="label">上传视频（最大 50MB）</div>
+    <div class="drop" id="drop" onclick="document.getElementById('fileInput').click()"
+         ondragover="ev(event,'over',true)" ondragleave="ev(event,'over',false)" ondrop="onDrop(event)">
+      <div class="drop-icon">🎥</div>
+      <p>点击或拖拽视频文件</p>
+      <p class="hint">支持 MP4、MOV、AVI、WebM</p>
+    </div>
+    <input type="file" id="fileInput" accept="video/*" style="display:none" onchange="setFile(this.files[0])">
+    <div class="preview" id="preview">
+      <span>📄</span>
+      <span id="fname"></span>
+      <span class="sz" id="fsize"></span>
+      <button class="rm" onclick="clearFile()">×</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="label">字幕 / 文字稿（选填，提升准确度）</div>
+    <textarea id="transcript" placeholder="粘贴视频字幕或旁白..."></textarea>
+  </div>
+
+  <div class="card">
+    <div class="label" style="margin-bottom:12px">拆解维度</div>
+    <div class="dims">
+      <div class="dim"><input type="checkbox" id="d1" checked><label for="d1">🎣 爆款钩子/开头</label></div>
+      <div class="dim"><input type="checkbox" id="d2" checked><label for="d2">💰 变现逻辑</label></div>
+      <div class="dim"><input type="checkbox" id="d3"><label for="d3">📋 脚本结构</label></div>
+      <div class="dim"><input type="checkbox" id="d4"><label for="d4">🎭 情绪节奏</label></div>
+      <div class="dim"><input type="checkbox" id="d5"><label for="d5">🎯 选题角度</label></div>
+      <div class="dim"><input type="checkbox" id="d6"><label for="d6">🔄 变现公式</label></div>
+    </div>
+    <button class="btn" id="btn" onclick="analyze()">✨ 开始拆解</button>
+    <div class="status" id="status"></div>
+    <div class="err" id="err"></div>
+  </div>
+
+  <div class="results" id="results">
+    <h2>📊 拆解报告</h2>
+    <div id="resultCards"></div>
+  </div>
+</div>
+
+<script>
+let file = null;
+
+function ev(e, cls, add) { e.preventDefault(); document.getElementById('drop').classList[add?'add':'remove'](cls); }
+function onDrop(e) { e.preventDefault(); ev(e,'over',false); setFile(e.dataTransfer.files[0]); }
+function toggleKey() {
+  const i = document.getElementById('apiKey');
+  const b = event.target;
+  i.type = i.type === 'password' ? 'text' : 'password';
+  b.textContent = i.type === 'password' ? '显示' : '隐藏';
+}
+function setFile(f) {
+  if (!f) return;
+  if (f.size > 50*1024*1024) { showErr('文件超过 50MB，请压缩后上传'); return; }
+  file = f;
+  document.getElementById('fname').textContent = f.name;
+  document.getElementById('fsize').textContent = (f.size/1024/1024).toFixed(1)+' MB';
+  document.getElementById('preview').style.display = 'flex';
+}
+function clearFile() { file = null; document.getElementById('preview').style.display = 'none'; document.getElementById('fileInput').value = ''; }
+function showErr(msg) { const e = document.getElementById('err'); e.textContent = '❌ '+msg; e.style.display = 'block'; }
+function clearErr() { document.getElementById('err').style.display = 'none'; }
+
+function getDims() {
+  const map = {
+    d1: '爆款钩子/开头分析（前3-5秒抓注意力的策略）',
+    d2: '变现逻辑（如何引导购买、涨粉或转化）',
+    d3: '脚本结构（开头-中间-结尾的逻辑架构）',
+    d4: '情绪节奏（情绪起伏与留存策略）',
+    d5: '选题角度（为什么这个选题容易爆）',
+    d6: '变现公式总结（可复制的套路）',
+  };
+  return Object.entries(map).filter(([k]) => document.getElementById(k).checked).map(([,v]) => v);
+}
+
+async function analyze() {
+  clearErr();
+  const apiKey = document.getElementById('apiKey').value.trim();
+  if (!apiKey) { showErr('请填写 Gemini API Key'); return; }
+  if (!file) { showErr('请上传视频文件'); return; }
+  const dims = getDims();
+  if (!dims.length) { showErr('请至少勾选一个拆解维度'); return; }
+
+  const btn = document.getElementById('btn');
+  const status = document.getElementById('status');
+  btn.disabled = true;
+  document.getElementById('results').style.display = 'none';
+
+  const fd = new FormData();
+  fd.append('apiKey', apiKey);
+  fd.append('transcript', document.getElementById('transcript').value.trim());
+  fd.append('dimensions', JSON.stringify(dims));
+  fd.append('video', file, file.name);
 
   try {
-    const chunks = [];
-    for await (const chunk of req) chunks.push(chunk);
-    const buffer = Buffer.concat(chunks);
-    const boundary = req.headers['content-type'].split('boundary=')[1];
-
-    const parts = parseMultipart(buffer, boundary);
-    const apiKey = parts.apiKey;
-    const transcript = parts.transcript || '';
-    const dimensions = parts.dimensions ? JSON.parse(parts.dimensions) : [];
-    const videoBuffer = parts.video;
-    const videoMime = parts.videoMime || 'video/mp4';
-    const videoName = parts.videoName || 'video.mp4';
-
-    if (!apiKey) return res.status(400).json({ error: '缺少 API Key' });
-    if (!videoBuffer) return res.status(400).json({ error: '缺少视频文件' });
-
-    // Step 1: Upload video to Gemini
-    const uploadRes = await fetch(
-      'https://generativelanguage.googleapis.com/upload/v1beta/files?uploadType=multipart',
-      {
-        method: 'POST',
-        headers: { 'X-Goog-Api-Key': apiKey },
-        body: buildMultipart(videoBuffer, videoMime, videoName),
-      }
-    );
-
-    if (!uploadRes.ok) {
-      const err = await uploadRes.json();
-      return res.status(400).json({ error: err.error?.message || '视频上传失败' });
-    }
-
-    const uploadData = await uploadRes.json();
-    const fileUri = uploadData.file?.uri;
-    const fileName = uploadData.file?.name;
-
-    // Step 2: Wait for video to be processed
-    let state = 'PROCESSING';
-    let attempts = 0;
-    while (state === 'PROCESSING' && attempts < 20) {
-      await sleep(3000);
-      const checkRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/${fileName}`,
-        { headers: { 'X-Goog-Api-Key': apiKey } }
-      );
-      const checkData = await checkRes.json();
-      state = checkData.state;
-      attempts++;
-    }
-
-    if (state !== 'ACTIVE') {
-      return res.status(400).json({ error: '视频处理超时，请重试' });
-    }
-
-    // Step 3: Analyze with Gemini
-    const transcriptText = transcript ? `\n\n字幕/文字稿：\n${transcript}` : '';
-    const prompt = `你是一位顶级短视频爆款分析师，请对这个视频进行深度拆解。
-
-请分析以下维度：
-${dimensions.map((d, i) => `${i + 1}. ${d}`).join('\n')}
-${transcriptText}
-
-请用中文回答，每个维度单独输出，格式：
-【维度名称】
-• 分析点1
-• 分析点2
-• 分析点3
-
-要求：直接、犀利、可操作，像在给创作者做实战复盘。`;
-
-    const genRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { fileData: { mimeType: videoMime, fileUri } },
-              { text: prompt }
-            ]
-          }]
-        })
-      }
-    );
-
-    if (!genRes.ok) {
-      const err = await genRes.json();
-      return res.status(400).json({ error: err.error?.message || '分析失败' });
-    }
-
-    const genData = await genRes.json();
-    const text = genData.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) return res.status(400).json({ error: '未获取到分析结果' });
-
-    return res.status(200).json({ result: text });
-
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
+    status.textContent = '⬆️ 上传视频中...';
+    const res = await fetch('/api/analyze', { method: 'POST', body: fd });
+    status.textContent = '🤖 AI 分析中，请稍候（约30-60秒）...';
+    const data = await res.json();
+    if (!res.ok || data.error) { showErr(data.error || '请求失败'); btn.disabled = false; status.textContent = ''; return; }
+    renderResults(data.result);
+    status.textContent = '';
+  } catch(e) {
+    showErr('网络错误：' + e.message);
+    status.textContent = '';
   }
+  btn.disabled = false;
 }
 
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-function parseMultipart(buffer, boundary) {
-  const parts = {};
-  const boundaryBuf = Buffer.from('--' + boundary);
-  let start = 0;
-
-  while (start < buffer.length) {
-    const bStart = bufferIndexOf(buffer, boundaryBuf, start);
-    if (bStart === -1) break;
-    const headerStart = bStart + boundaryBuf.length + 2;
-    const headerEnd = bufferIndexOf(buffer, Buffer.from('\r\n\r\n'), headerStart);
-    if (headerEnd === -1) break;
-    const headerStr = buffer.slice(headerStart, headerEnd).toString();
-    const nextBoundary = bufferIndexOf(buffer, boundaryBuf, headerEnd);
-    const bodyEnd = nextBoundary === -1 ? buffer.length : nextBoundary - 2;
-    const body = buffer.slice(headerEnd + 4, bodyEnd);
-
-    const nameMatch = headerStr.match(/name="([^"]+)"/);
-    const filenameMatch = headerStr.match(/filename="([^"]+)"/);
-    const mimeMatch = headerStr.match(/Content-Type: ([^\r\n]+)/);
-
-    if (nameMatch) {
-      const name = nameMatch[1];
-      if (filenameMatch) {
-        parts[name] = body;
-        parts[name + 'Mime'] = mimeMatch ? mimeMatch[1].trim() : 'application/octet-stream';
-        parts[name + 'Name'] = filenameMatch[1];
-      } else {
-        parts[name] = body.toString().trim();
-      }
-    }
-    start = nextBoundary === -1 ? buffer.length : nextBoundary;
+function renderResults(text) {
+  const icons = ['🎣','💰','📋','🎭','🎯','🔄'];
+  const sections = text.split(/【/).filter(s => s.trim());
+  const container = document.getElementById('resultCards');
+  container.innerHTML = '';
+  if (sections.length <= 1) {
+    container.innerHTML = `<div class="rcard"><div class="content">${text}</div></div>`;
+  } else {
+    sections.forEach((s, i) => {
+      const parts = s.split('】');
+      const title = parts[0] || '分析';
+      const content = (parts[1] || '').trim();
+      const div = document.createElement('div');
+      div.className = 'rcard';
+      div.innerHTML = `<h3>${icons[i]||'📌'} ${title}</h3><div class="content">${content}</div>`;
+      container.appendChild(div);
+    });
   }
-  return parts;
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
 }
-
-function bufferIndexOf(buf, search, start = 0) {
-  for (let i = start; i <= buf.length - search.length; i++) {
-    let found = true;
-    for (let j = 0; j < search.length; j++) {
-      if (buf[i + j] !== search[j]) { found = false; break; }
-    }
-    if (found) return i;
-  }
-  return -1;
-}
-
-function buildMultipart(videoBuffer, mimeType, filename) {
-  const boundary = 'gem_boundary_' + Date.now();
-  const meta = JSON.stringify({ file: { display_name: filename } });
-  const header = Buffer.from(
-    `--${boundary}\r\nContent-Type: application/json; charset=utf-8\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`
-  );
-  const footer = Buffer.from(`\r\n--${boundary}--`);
-  const body = Buffer.concat([header, videoBuffer, footer]);
-  return new Blob([body], { type: `multipart/related; boundary=${boundary}` });
-}
+</script>
+</body>
+</html>
